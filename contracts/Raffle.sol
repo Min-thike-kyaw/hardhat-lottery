@@ -30,28 +30,37 @@ contract Raffle is VRFConsumerBaseV2, AutomationCompatibleInterface {
     RaffleState private s_raffleState;
     uint256 private s_lastTimeStamp;
     address private s_recentWinner;
+    address s_owner;
 
     /* Events */
     event WinnerPicked(address indexed player);
     event RaffleEnter(address indexed addres);
     event RequestedRaffleWinner(uint256 requestId);
+    event CreatedSubscription(uint64 subscriptionId);
     
     constructor(address vrfCoordinator, 
-        uint64 subscriptionId,
+        // uint64 subscriptionId,
         bytes32 gasLane, // keyHash
         uint256 interval,
         uint256 entranceFee,
         uint32 callbackGasLimit
     ) VRFConsumerBaseV2(vrfCoordinator) {
+        s_owner = msg.sender;
+        
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinator);
         i_gasLane = gasLane;
         i_interval = interval;
-        i_subscriptionId = subscriptionId;
+        
         i_entranceFee = entranceFee;
         s_raffleState = RaffleState.OPEN;
         s_lastTimeStamp = block.timestamp;
         i_callbackGasLimit = callbackGasLimit;
+
+    
+        i_subscriptionId = i_vrfCoordinator.createSubscription();
+        emit CreatedSubscription(i_subscriptionId);
     }
+
 
     function checkUpkeep(bytes memory /* checkData */) 
         public 
@@ -76,6 +85,7 @@ contract Raffle is VRFConsumerBaseV2, AutomationCompatibleInterface {
             revert Raffle__UpkeepNotNeeded(address(this).balance, s_players.length, uint256(s_raffleState));
         }
         s_raffleState = RaffleState.CALCULATING;
+        
         uint256 requestId = i_vrfCoordinator.requestRandomWords(
             i_gasLane, i_subscriptionId, REQUEST_CONFIRMATIONS, i_callbackGasLimit, NUM_WORDS
         );
@@ -110,5 +120,44 @@ contract Raffle is VRFConsumerBaseV2, AutomationCompatibleInterface {
         }
         s_players.push(payable(msg.sender));
         emit RaffleEnter(msg.sender);
+    }
+
+    /**
+     * Getter Functions
+     */
+    function getRaffleState() public view returns (RaffleState) {
+        return s_raffleState;
+    }
+
+    function getNumWords() public pure returns (uint256) {
+        return NUM_WORDS;
+    }
+
+    function getRequestConfirmations() public pure returns (uint256) {
+        return REQUEST_CONFIRMATIONS;
+    }
+
+    function getRecentWinner() public view returns (address) {
+        return s_recentWinner;
+    }
+
+    function getPlayer(uint256 index) public view returns (address) {
+        return s_players[index];
+    }
+
+    function getLastTimeStamp() public view returns (uint256) {
+        return s_lastTimeStamp;
+    }
+
+    function getInterval() public view returns (uint256) {
+        return i_interval;
+    }
+
+    function getEntranceFee() public view returns (uint256) {
+        return i_entranceFee;
+    }
+
+    function getNumberOfPlayers() public view returns (uint256) {
+        return s_players.length;
     }
 }
